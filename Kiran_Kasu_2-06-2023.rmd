@@ -1,0 +1,191 @@
+---
+title: ''
+output: html_document
+---
+
+```{r}
+library(sqldf)
+library(ggplot2)
+library(dplyr)
+library(hrbrthemes)
+library(readxl)
+library(tidyverse)
+library(kableExtra)
+```
+
+```{r}
+# Reading CSV file
+Diabetes <- read_excel("E:/A M.S in Informatics - Northeastern/Analytics/Communications and Visualizations/Assingment 3/Diabetes 2.xlsx")
+Diabetes_2 <- read_excel("E:/A M.S in Informatics - Northeastern/Analytics/Communications and Visualizations/Assingment 3/Diabetes.xlsx")
+DiabetesCovid <- read_excel("archive (1)/Covid Data.xlsx")
+
+DiabetesCovid2 = drop_na((DiabetesCovid))
+```
+
+```{r}
+
+# Creating New Dataframes which will be used in further analysis
+
+Diabetes1 = sqldf("select id, YEAR, State, rate, deaths from Diabetes")
+
+Diabetes2 = sqldf("select race, gender, age, number_outpatient, number_emergency, number_diagnoses, medical_specialty, diabetesMed, readmitted from Diabetes_2")
+
+
+
+DiabetesComb = cbind(Diabetes1, Diabetes2)
+
+
+```
+
+```{r}
+# Dashboard Creation Starts from here
+
+library(shiny)
+library(shinydashboard)
+library(gridExtra)
+```
+
+
+```{r}
+#Creating Objects
+
+BarChart = sqldf("select race, sum(deaths)/1000 as DeathSum from DiabetesComb group by race")
+AgeChart = sqldf("select age, sum(deaths) as Death2 from DiabetesComb group by age")
+DiabetesMed = sqldf("select number_diagnoses, Gender from DiabetesComb group by Gender")
+Outpatient = sqldf("select number_diagnoses, medical_specialty from DiabetesComb group by medical_specialty")
+Yearly = sqldf("select year,Deaths from DiabetesComb group by year ")
+YearlyCOVID = sqldf("select YEAR, SUM(DIABETES)/1000 as Diabetes2 from DiabetesCovid2 group by YEAR")
+
+min(DiabetesCovid$YEAR)
+
+
+MeanValuePatients = mean(BarChart$DeathSum)
+
+
+UI <-
+  
+  dashboardPage(skin = "black", 
+  dashboardHeader(title = "Good Morning Dr. Diabetes Statistics for United States", titleWidth = 450),
+  
+  
+  dashboardSidebar(tags$head(tags$style(HTML('.shiny-server-account { display: none; }'))), width = 350,
+
+    # The dynamically-generated user panel
+    uiOutput("userpanel"),
+    
+    menuItem("Analysis",  icon = icon("Circle"), 
+             tabName = "graphs"),
+    
+     br(),
+    menuItem("Diabetes Stats According to Age",  icon = icon("table"), 
+             tabName = "Diabetes_Deaths"),
+    br(),
+    menuItem("Diabetes Stats According to Gender",  icon = icon("circle"), 
+             tabName = "Diabetes_Gender"),
+    br(),
+    menuItem("Diabetes Stats According to Hospital Department",  icon = icon("circle"), 
+             tabName = "Diabetes_Patients"),
+    
+    br(),
+    menuItem("Diabetes Stats According to Year",  icon = icon("bar-chart-o"), 
+             tabName = "Diabetes_Year")  ,
+    
+    br(),
+    menuItem("Diabetes due to COVID-19 According to Year",  icon = icon("bar-chart-o"), 
+             tabName = "DiabetesCOVID_Year")
+    
+  ),
+  dashboardBody(
+    
+    fluidRow(
+    box(
+      title = "Mean Value of Diabetes Patiets acrross United States", width = 5, status = "danger",
+      "111.397"
+    )),
+    
+    tabItems(
+      tabItem("graphs",
+              
+              h3("Analysis of dataset based on  
+                 all Different Sub-Categories"),
+              p("The graph above shows the number of cases of diabetes in United States by race. The majority of these cases are seen in Caucasian people, accounting for 70% of all diagnosed diabetics. This data helps us understand that there are specific health needs for individuals with different racial backgrounds." ),
+              box(selectInput("input_selected","Please select one option :",
+                              c('Race', 'Age')),
+                  width = 4),
+              box(plotOutput("plot1"),width=8)
+      ),
+       
+      tabItem("Diabetes_Deaths",
+              h1("Diabetes Deaths vs Age"), 
+              p("The graph below shows the death due to diabetes mellitus according to the age of patients, and we can see that mostly the patients with ages between 70-80, this graph shows the deaths due to diabetes mellitus. The amount of deaths is directly proportional to the age of the patient. This can be because of complication secondary to diabetes mellitus or cardiovascular diseases, or due to other causes such as infection or complications secondary to pregnancy (from gi syndrome)."),
+              
+              dataTableOutput("plot2") 
+               
+      
+    ),
+       
+      tabItem("Diabetes_Gender",
+              h1("Diabetes Cases Vs Gender"),
+              p("The below graph shows the diabetes cases according to gender, and we can see that women have equal rates. The high rate of diabetes in women is mainly a result of the fact that they traditionally take care of house, children and family more than men."),
+              plotOutput("plot3")),
+       
+      tabItem("Diabetes_Patients",
+              h1("Diabetes Cases vs Department"),
+               p("Below graph we can see diabetes cases according to different department, this dataset includes data from 2020 which shows how diabetes patients were affected because of COVID-19. Below we can see the difference, in the previous graphs we saw that internal medicine was the department which had maximum of patients whereas now when we added COVID-19 dataset to the graph now we can see most of the patients are seen in the preventive medicine department"),
+              plotOutput("plot4", height = 450))
+    
+    ,
+       
+      tabItem("Diabetes_Year",
+              h1("Diabetes Cases vs Year"),
+              p("The below graph shows the diabetes cases according to year, we can see there is a spike in amount of patients in 2020 and compairing it to our previous graph."),
+              plotOutput("lineplot"))
+    
+       ,
+       
+      tabItem("DiabetesCOVID_Year",
+              h1("Diabetes Cases vs Year"),
+              p("The below graph shows the diabetes cases according to year, we can see there is a spike in amount of patients in 2020 and compairing it to our previous graph."),
+              plotOutput("lineplotCOVID"))
+    
+    
+    
+    )))
+
+
+library(RColorBrewer)
+
+par(mar = c(4, 2, 2, 2))
+
+server = function(input, output) {   
+  
+  output$plot1 = renderPlot({Diabetes = read.csv("E:/A M.S in Informatics - Northeastern/Analytics/Communications and Visualizations/Assingment 3/Diabetes 2.xlsx", header = TRUE, sep = ",")
+                            
+barplot(BarChart$DeathSum, names.arg = BarChart$race, col = brewer.pal(4, "Dark2"))})
+  
+  output$plot2 = renderDataTable(AgeChart)
+  
+  output$plot3 = renderPlot({Diabetes = read.csv("E:/A M.S in Informatics - Northeastern/Analytics/Communications and Visualizations/Assingment 3/Diabetes 2.xlsx", header = TRUE, sep = ",")
+                            barplot(DiabetesMed$number_diagnoses, names.arg = DiabetesMed$gender, col = brewer.pal(4, "Dark2"))})
+  
+   output$plot4 = renderPlot({Diabetes = read.csv("archive (1)/Covid Data.xlsx", header = TRUE, sep = ",")
+                            barplot(Outpatient$number_diagnoses, names.arg = Outpatient$medical_specialty, horiz = F, las = 2,spacing=2, col = brewer.pal(4, "Dark2"))})
+  
+   output$lineplot <- renderPlot({ggplot(Yearly, aes(x=Yearly$YEAR, y=Yearly$DEATHS)) +
+  geom_line() + 
+  xlab("")
+  })
+   
+    output$lineplotCOVID <- renderPlot({ggplot(YearlyCOVID, aes(x=YearlyCOVID$YEAR, y=YearlyCOVID$Diabetes2)) +
+  geom_line() + 
+  xlab("")
+  })
+   
+   
+}
+
+shinyApp(UI,server)
+```
+
+
+
